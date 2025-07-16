@@ -51,6 +51,7 @@ const ECGPlayer = {
     this.setupThemeListener();
     this.setupKeyboardListeners();
     this.setupLiveViewListeners();
+    this.setupFullscreenListeners();
   },
 
   /**
@@ -133,6 +134,10 @@ const ECGPlayer = {
           event.preventDefault();
           this.togglePlayback();
           break;
+        case "f":
+          event.preventDefault();
+          this.toggleFullscreen();
+          break;
       }
     };
 
@@ -185,6 +190,24 @@ const ECGPlayer = {
         this.canvasClickHandler
       );
     }
+    if (this.fullscreenChangeHandler) {
+      document.removeEventListener(
+        "fullscreenchange",
+        this.fullscreenChangeHandler
+      );
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        this.fullscreenChangeHandler
+      );
+      document.removeEventListener(
+        "mozfullscreenchange",
+        this.fullscreenChangeHandler
+      );
+      document.removeEventListener(
+        "MSFullscreenChange",
+        this.fullscreenChangeHandler
+      );
+    }
 
     // Explicitly nullify large data objects to break references
     this.ecgLeadDatasets = null;
@@ -232,6 +255,10 @@ const ECGPlayer = {
     this.waveformContext = null;
     this.qrsFlashCanvas = null;
     this.qrsFlashContext = null;
+
+    // Fullscreen state
+    this.isFullscreen = false;
+    this.fullscreenChangeHandler = null;
   },
 
   // ========================
@@ -333,6 +360,9 @@ const ECGPlayer = {
 
       // Set initial lead selector visibility
       this.updateLeadSelectorVisibility(this.displayMode);
+
+      // Setup fullscreen button
+      this.setupFullscreenButton();
 
       console.log("ECG data loaded successfully:", {
         samplingRate: this.samplingRate,
@@ -676,6 +706,148 @@ const ECGPlayer = {
       gridDots: isDark ? "#666666" : "#999999",
       labels: isDark ? "#ffffff" : "#333333",
     };
+  },
+
+  // ==================
+  // FULLSCREEN SUPPORT
+  // ==================
+
+  /**
+   * Sets up fullscreen change event listeners with cross-browser compatibility.
+   * @returns {void}
+   */
+  setupFullscreenListeners() {
+    this.fullscreenChangeHandler = () => {
+      this.handleFullscreenChange();
+    };
+
+    document.addEventListener("fullscreenchange", this.fullscreenChangeHandler);
+    document.addEventListener(
+      "webkitfullscreenchange",
+      this.fullscreenChangeHandler
+    );
+    document.addEventListener(
+      "mozfullscreenchange",
+      this.fullscreenChangeHandler
+    );
+    document.addEventListener(
+      "MSFullscreenChange",
+      this.fullscreenChangeHandler
+    );
+  },
+
+  /**
+   * Handles fullscreen state changes and updates the UI accordingly.
+   * @returns {void}
+   */
+  handleFullscreenChange() {
+    const isCurrentlyFullscreen = this.isDocumentInFullscreen();
+
+    if (isCurrentlyFullscreen !== this.isFullscreen) {
+      this.isFullscreen = isCurrentlyFullscreen;
+      this.updateFullscreenStyles(this.isFullscreen);
+      this.updateFullscreenButton();
+      this.recreateCanvasAndRestart();
+    }
+  },
+
+  /**
+   * Checks if the document is currently in fullscreen mode.
+   * @returns {boolean} True if in fullscreen mode, false otherwise.
+   */
+  isDocumentInFullscreen() {
+    return !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
+  },
+
+  /**
+   * Toggles fullscreen mode on/off.
+   * @returns {void}
+   */
+  toggleFullscreen() {
+    if (this.isDocumentInFullscreen()) {
+      this.exitFullscreen();
+    } else {
+      this.requestFullscreen();
+    }
+  },
+
+  /**
+   * Requests fullscreen mode for the ECG player container.
+   * @returns {void}
+   */
+  requestFullscreen() {
+    const element = document.getElementById("ecg-player-container");
+
+    if (element.requestFullscreen) {
+      element.requestFullscreen();
+    } else if (element.webkitRequestFullscreen) {
+      element.webkitRequestFullscreen();
+    } else if (element.mozRequestFullScreen) {
+      element.mozRequestFullScreen();
+    } else if (element.msRequestFullscreen) {
+      element.msRequestFullscreen();
+    }
+  },
+
+  /**
+   * Exits fullscreen mode.
+   * @returns {void}
+   */
+  exitFullscreen() {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
+  },
+
+  /**
+   * Sets up the fullscreen button click handler.
+   * @returns {void}
+   */
+  setupFullscreenButton() {
+    const button = document.getElementById("fullscreen-button");
+    if (button && !button.dataset.listenerAdded) {
+      button.addEventListener("click", () => {
+        this.toggleFullscreen();
+      });
+      button.dataset.listenerAdded = "true";
+    }
+  },
+
+  /**
+   * Updates the fullscreen button icon and tooltip based on current state.
+   * @returns {void}
+   */
+  updateFullscreenButton() {
+    const button = document.getElementById("fullscreen-button");
+    if (button) {
+      const iconClass = this.isFullscreen
+        ? "hero-arrows-pointing-in"
+        : "hero-arrows-pointing-out";
+      const tooltip = this.isFullscreen
+        ? "Exit Fullscreen (f)"
+        : "Enter Fullscreen (f)";
+
+      button.innerHTML = `<svg class="w-5 h-5 ${iconClass}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        ${
+          this.isFullscreen
+            ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />'
+            : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l4 4m12-4v4m0-4h-4m4 0l-4 4M4 16v4m0 0h4m-4 0l4-4m12 4v-4m0 4h-4m4 0l-4-4" />'
+        }
+      </svg>`;
+
+      button.title = tooltip;
+    }
   },
 
   // ===================
