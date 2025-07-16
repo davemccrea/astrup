@@ -42,13 +42,22 @@ defmodule AstrupWeb.Components.EcgPlayer do
         <% end %>
 
         <div class="relative py-8">
-          <div id="ecg-player-container" class="ecg-player-container">
-            <div id="ecg-player" phx-hook="ECGPlayer" phx-update="ignore" phx-target={@myself}>
-              <div data-ecg-chart></div>
+          <div
+            id="ecg-player-container"
+            class="flex flex-col fullscreen:bg-base-100 fullscreen:p-5 fullscreen:h-screen fullscreen:w-screen"
+          >
+            <div
+              id="ecg-player"
+              class="fullscreen:flex-1 fullscreen:flex fullscreen:flex-col"
+              phx-hook="ECGPlayer"
+              phx-update="ignore"
+              phx-target={@myself}
+            >
+              <div data-ecg-chart class="fullscreen:flex-1 fullscreen:w-full fullscreen:h-full"></div>
             </div>
 
-            <div class="flex justify-between mt-2 ecg-controls">
-              <div class="flex gap-2">
+            <div class="flex justify-between mt-2 fullscreen:mt-5 fullscreen:flex-shrink-0">
+              <div class="flex gap-2 fullscreen:bg-base-200 fullscreen:text-base-content fullscreen:p-2.5 fullscreen:rounded-lg">
                 <.button id="play-pause-button" class="btn btn-sm">
                   <.icon name="hero-play" class="w-4 h-4" />
                   <span class="ml-1">Play</span>
@@ -59,7 +68,7 @@ defmodule AstrupWeb.Components.EcgPlayer do
                 </.button>
               </div>
 
-              <div class="ecg-instructions">
+              <div class="fullscreen:bg-base-200 fullscreen:text-base-content fullscreen:p-2.5 fullscreen:rounded-lg">
                 <%= if @instructions != [] do %>
                   {render_slot(@instructions)}
                 <% else %>
