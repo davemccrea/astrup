@@ -4,16 +4,18 @@ defmodule AstrupWeb.Components.EcgPlayer do
   use AstrupWeb, :live_component
 
   def update(assigns, socket) do
+    # Load settings within component based on current scope
+    settings = Settings.get_settings(assigns.current_scope)
+    
     form =
-      assigns
-      |> Map.get(:settings)
+      settings
       |> Settings.changeset(%{})
       |> to_form()
 
     {:ok,
      socket
      |> assign(assigns)
-     |> assign(settings: assigns.settings)
+     |> assign(settings: settings)
      |> assign(form: form)
      |> assign(
        :lead_names,
@@ -24,10 +26,7 @@ defmodule AstrupWeb.Components.EcgPlayer do
 
   attr :env, :string, required: true, doc: "Application environment"
   attr :ecg_data, :map, default: nil, doc: "ECG data to be pushed to the hook"
-
-  attr :settings, :map,
-    default: nil,
-    doc: "ECG player settings (will use defaults if not provided)"
+  attr :current_scope, :any, required: true, doc: "Current scope for loading settings"
 
   slot :actions, doc: "Action buttons displayed in the header"
   slot :sidebar, doc: "Content displayed in the sidebar panel"

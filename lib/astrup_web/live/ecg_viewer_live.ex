@@ -1,5 +1,4 @@
 defmodule AstrupWeb.ECGViewerLive do
-  alias Astrup.Settings
   use AstrupWeb, :live_view
 
   alias Astrup.ECG
@@ -12,7 +11,6 @@ defmodule AstrupWeb.ECGViewerLive do
       |> assign(:ecg_saved, false)
       |> assign(:metadata, %{})
       |> assign(:ecg_data, nil)
-      |> assign(:settings, Settings.get_settings(socket.assigns.current_scope))
 
     {:ok, socket}
   end
@@ -51,7 +49,7 @@ defmodule AstrupWeb.ECGViewerLive do
             id="ecg-player"
             env={@env}
             ecg_data={@ecg_data}
-            settings={@settings}
+            current_scope={@current_scope}
           >
             <:actions>
               <.button
