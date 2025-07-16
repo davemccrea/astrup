@@ -14,9 +14,17 @@ HappiHub is an interactive learning platform for arterial blood gas (ABG) interp
 - **ECG integration** for comprehensive patient assessment
 - **Multi-language support** (English, Finnish, Swedish)
 
-## Development Commands
+## Development Methodology
 
-After making any code changes, run `mix check` (verifies compilation and suggests improvements).
+You should always being by checking reviewing CONVENTIONS.md and ROADMAP.md.
+
+When given a problem first:
+
+1. Write a failing test
+2. Write code to make the test pass
+3. If the test passes, commit the changes to git
+
+Repeat this pattern until the problem is solved.
 
 ### Available MCPs for Development
 
