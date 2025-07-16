@@ -289,7 +289,8 @@ describe('ECGPlayer - Fullscreen Functionality', () => {
   describe('Fullscreen Styling', () => {
     describe('updateFullscreenStyles()', () => {
       beforeEach(() => {
-        ecgPlayer.updateFullscreenStyles = ECGPlayer.updateFullscreenStyles;
+        // Mock the method since it's now a no-op
+        ecgPlayer.updateFullscreenStyles = vi.fn();
       });
 
       it('should handle fullscreen styling (CSS-driven)', () => {
