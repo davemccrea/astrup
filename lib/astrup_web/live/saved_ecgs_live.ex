@@ -149,7 +149,7 @@ defmodule AstrupWeb.SavedEcgsLive do
                 <td>
                   <div class="flex gap-2">
                     <.link
-                      href={~p"/ecg/viewer?db=#{ecg.db_name}&filename=#{ecg.filename}"}
+                      href={~p"/ecg/viewer?dataset_name=#{ecg.db_name}&filename=#{ecg.filename}"}
                       class="btn btn-sm btn-primary"
                       title="View ECG"
                     >

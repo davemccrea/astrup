@@ -4,7 +4,6 @@ defmodule AstrupWeb.Components.EcgPlayer do
   use AstrupWeb, :live_component
 
   def update(assigns, socket) do
-    # Load settings within component based on current scope
     settings = Settings.get_settings(assigns.current_scope)
 
     form =
