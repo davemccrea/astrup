@@ -6,7 +6,7 @@ defmodule AstrupWeb.Components.EcgPlayer do
   def update(assigns, socket) do
     # Load settings within component based on current scope
     settings = Settings.get_settings(assigns.current_scope)
-    
+
     form =
       settings
       |> Settings.changeset(%{})
