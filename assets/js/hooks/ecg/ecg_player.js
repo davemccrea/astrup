@@ -670,17 +670,21 @@ const ECGPlayer = {
 
   /**
    * Calculates the pixel offset and width for a lead in the multi-lead display grid.
+   * Uses a unified continuous grid approach where leads are positioned to align perfectly
+   * with the underlying grid pattern, ensuring boundary areas are proper grid cell sizes.
    * @param {number} leadIndex - The index of the ECG lead.
    * @returns {{xOffset: number, yOffset: number, columnWidth: number}} The position and width for the lead.
    */
   calculateLeadGridCoordinates(leadIndex) {
     const { column, row } = this.getLeadColumnAndRow(leadIndex);
-    const totalColumnPadding = (COLUMNS_PER_DISPLAY - 1) * COLUMN_PADDING;
-    const columnWidth =
-      (this.chartWidth - totalColumnPadding) / COLUMNS_PER_DISPLAY;
+    
+    // Use natural column width - don't artificially constrain to grid multiples
+    // The grid will be drawn continuously and leads positioned to align with it
+    const columnWidth = this.chartWidth / COLUMNS_PER_DISPLAY;
 
-    const xOffset = column * (columnWidth + COLUMN_PADDING);
-    const yOffset = row * (this.leadHeight + ROW_PADDING);
+    // Position leads directly - grids touch with no padding
+    const xOffset = column * columnWidth;
+    const yOffset = row * this.leadHeight;
 
     return { xOffset, yOffset, columnWidth };
   },
@@ -893,8 +897,7 @@ const ECGPlayer = {
     const canvasHeight =
       this.displayMode === "multi"
         ? ROWS_PER_DISPLAY *
-            ((CHART_HEIGHT * this.heightScale) / MULTI_LEAD_HEIGHT_SCALE) +
-          (ROWS_PER_DISPLAY - 1) * ROW_PADDING
+            ((CHART_HEIGHT * this.heightScale) / MULTI_LEAD_HEIGHT_SCALE)
         : CHART_HEIGHT * this.heightScale;
 
     this.leadHeight =
@@ -2213,17 +2216,13 @@ const ECGPlayer = {
 
     // Render grid directly to background context
     if (this.displayMode === "multi" && this.leadNames) {
+      // Draw one continuous grid across the entire canvas
+      this.drawContinuousGrid(canvasHeight);
+      
+      // Draw lead labels only (no individual grids)
       for (let i = 0; i < this.leadNames.length; i++) {
-        const { xOffset, yOffset, columnWidth } =
-          this.calculateLeadGridCoordinates(i);
-        this.renderLeadBackground(
-          i,
-          xOffset,
-          yOffset,
-          columnWidth,
-          this.leadHeight,
-          this.backgroundContext
-        );
+        const { xOffset, yOffset } = this.calculateLeadGridCoordinates(i);
+        this.drawLeadLabel(i, xOffset, yOffset, this.backgroundContext);
       }
     } else if (this.leadNames) {
       this.renderLeadBackground(
@@ -2234,6 +2233,26 @@ const ECGPlayer = {
         CHART_HEIGHT * this.heightScale,
         this.backgroundContext
       );
+    }
+  },
+
+  /**
+   * Draws a continuous grid across the entire canvas for multi-lead mode.
+   * This ensures proper grid cell sizes at boundaries between leads.
+   * @param {number} canvasHeight - The height of the canvas.
+   * @returns {void}
+   */
+  drawContinuousGrid(canvasHeight) {
+    if (this.gridType === "graph_paper") {
+      this.drawMedicalGrid({
+        bounds: { xOffset: 0, yOffset: 0, width: this.chartWidth, height: canvasHeight },
+        context: this.backgroundContext,
+      });
+    } else {
+      this.drawSimpleGrid({
+        bounds: { xOffset: 0, yOffset: 0, width: this.chartWidth, height: canvasHeight },
+        context: this.backgroundContext,
+      });
     }
   },
 

@@ -53,6 +53,7 @@ describe('ECGPlayer - Canvas Management', () => {
     };
     ecgPlayer.chartWidth = 1000;
     ecgPlayer.heightScale = 1.0;
+    ecgPlayer.gridScale = 1.0;
     ecgPlayer.displayMode = 'single';
     ecgPlayer.leadHeight = 150;
     ecgPlayer.setupCanvasClickHandler = vi.fn();
@@ -462,22 +463,31 @@ describe('ECGPlayer - Canvas Management', () => {
         ecgPlayer.getLeadColumnAndRow = vi.fn().mockReturnValue({ column: 1, row: 2 });
       });
 
-      it('should calculate correct coordinates', () => {
+      it('should calculate correct coordinates with unified continuous grid', () => {
         const result = ecgPlayer.calculateLeadGridCoordinates(6);
         
         expect(ecgPlayer.getLeadColumnAndRow).toHaveBeenCalledWith(6);
-        expect(result.xOffset).toBe(250); // column 1 * (250 + 0 padding)
-        expect(result.yOffset).toBe(300); // row 2 * (150 + 0 padding)
-        expect(result.columnWidth).toBe(250);
+        
+        // With unified continuous grid - natural column width, no artificial constraints
+        const expectedColumnWidth = 1000 / 4; // 250px - natural division
+        const expectedXOffset = 1 * expectedColumnWidth; // column 1: 250px
+        const expectedYOffset = 2 * 150; // row 2: 300px
+        
+        expect(result.xOffset).toBe(expectedXOffset);
+        expect(result.yOffset).toBe(expectedYOffset);
+        expect(result.columnWidth).toBe(expectedColumnWidth);
       });
 
-      it('should handle padding correctly', () => {
+      it('should handle unified continuous grid correctly', () => {
         // Test with different chart width
         ecgPlayer.chartWidth = 800;
         
         const result = ecgPlayer.calculateLeadGridCoordinates(0);
         
-        expect(result.columnWidth).toBe(200); // 800 / 4 columns
+        // With unified continuous grid - natural column width
+        const expectedColumnWidth = 800 / 4; // 200px - natural division
+        
+        expect(result.columnWidth).toBe(expectedColumnWidth);
       });
     });
   });

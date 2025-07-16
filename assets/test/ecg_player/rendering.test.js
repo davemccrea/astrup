@@ -306,6 +306,8 @@ describe('ECGPlayer - Rendering', () => {
         height: 400
       };
       ecgPlayer.renderLeadBackground = vi.fn();
+      ecgPlayer.drawContinuousGrid = vi.fn();
+      ecgPlayer.drawLeadLabel = vi.fn();
       ecgPlayer.calculateLeadGridCoordinates = vi.fn().mockReturnValue({
         xOffset: 0,
         yOffset: 0,
@@ -329,11 +331,16 @@ describe('ECGPlayer - Rendering', () => {
       );
     });
 
-    it('should render multi-lead backgrounds', () => {
+    it('should render unified continuous grid for multi-lead', () => {
       ecgPlayer.displayMode = 'multi';
       ecgPlayer.renderGridBackground();
 
-      expect(ecgPlayer.renderLeadBackground).toHaveBeenCalledTimes(4);
+      // Should draw one continuous grid instead of individual lead backgrounds
+      expect(ecgPlayer.drawContinuousGrid).toHaveBeenCalledTimes(1);
+      expect(ecgPlayer.drawContinuousGrid).toHaveBeenCalledWith(400);
+      
+      // Should draw lead labels for each lead
+      expect(ecgPlayer.drawLeadLabel).toHaveBeenCalledTimes(4);
       expect(ecgPlayer.calculateLeadGridCoordinates).toHaveBeenCalledTimes(4);
     });
 
@@ -460,6 +467,144 @@ describe('ECGPlayer - Rendering', () => {
       ecgPlayer.updateThemeColors();
 
       expect(ecgPlayer.colors.waveform).toBe('#000000');
+    });
+  });
+
+  describe('Grid Layout and Coordinates - Unified Continuous Grid', () => {
+    let mockElement;
+
+    beforeEach(() => {
+      mockElement = {
+        querySelector: vi.fn().mockReturnValue({
+          offsetWidth: 800
+        }),
+        getAttribute: vi.fn().mockReturnValue('test-component')
+      };
+      
+      ecgPlayer.el = mockElement;
+      ecgPlayer.gridScale = 1.0;
+      ecgPlayer.heightScale = 1.0;
+      ecgPlayer.chartWidth = 800;
+      ecgPlayer.leadHeight = 150;
+      ecgPlayer.leadNames = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
+    });
+
+    describe('Natural column widths (unified continuous grid)', () => {
+      it('should use natural column width divisions', () => {
+        const result = ecgPlayer.calculateLeadGridCoordinates(0);
+        
+        // With unified continuous grid, use natural column width
+        const expectedColumnWidth = ecgPlayer.chartWidth / 4; // 200px
+        expect(result.columnWidth).toBe(expectedColumnWidth);
+      });
+
+      it('should maintain natural divisions across different chart widths', () => {
+        const testWidths = [600, 800, 1000, 1200];
+        
+        testWidths.forEach(width => {
+          ecgPlayer.chartWidth = width;
+          const result = ecgPlayer.calculateLeadGridCoordinates(0);
+          
+          // Should always use natural division
+          const expectedColumnWidth = width / 4;
+          expect(result.columnWidth).toBe(expectedColumnWidth);
+        });
+      });
+
+      it('should not artificially constrain column widths', () => {
+        ecgPlayer.chartWidth = 850; // Non-round number
+        const result = ecgPlayer.calculateLeadGridCoordinates(0);
+        
+        // Should use exact natural division, not constrained to grid multiples
+        const expectedColumnWidth = 850 / 4; // 212.5px
+        expect(result.columnWidth).toBe(expectedColumnWidth);
+      });
+    });
+
+    describe('Unified continuous grid layout', () => {
+      it('should have no spacing between columns (grids touch)', () => {
+        // Test spacing between adjacent columns
+        const lead0 = ecgPlayer.calculateLeadGridCoordinates(0); // Column 0
+        const lead3 = ecgPlayer.calculateLeadGridCoordinates(3); // Column 1
+        
+        const actualColumnSpacing = lead3.xOffset - lead0.xOffset - lead0.columnWidth;
+        expect(actualColumnSpacing).toBe(0); // No spacing - grids touch
+      });
+
+      it('should have no spacing between rows (grids touch)', () => {
+        // Test spacing between adjacent rows
+        const lead0 = ecgPlayer.calculateLeadGridCoordinates(0); // Row 0
+        const lead1 = ecgPlayer.calculateLeadGridCoordinates(1); // Row 1
+        
+        const actualRowSpacing = lead1.yOffset - lead0.yOffset - ecgPlayer.leadHeight;
+        expect(actualRowSpacing).toBe(0); // No spacing - grids touch
+      });
+
+      it('should maintain touching grids across all scale settings', () => {
+        const testScales = [0.75, 1.0, 1.25];
+        
+        testScales.forEach(scale => {
+          ecgPlayer.gridScale = scale;
+          
+          const lead0 = ecgPlayer.calculateLeadGridCoordinates(0);
+          const lead3 = ecgPlayer.calculateLeadGridCoordinates(3);
+          
+          const actualColumnSpacing = lead3.xOffset - lead0.xOffset - lead0.columnWidth;
+          
+          // Grids should always touch regardless of scale
+          expect(actualColumnSpacing).toBe(0);
+        });
+      });
+
+      it('should prevent visual discontinuities with unified continuous grid', () => {
+        // With unified continuous grid, visual continuity is maintained by drawing
+        // one grid across the entire canvas, not individual grids per lead
+        
+        const lead0 = ecgPlayer.calculateLeadGridCoordinates(0);
+        const lead3 = ecgPlayer.calculateLeadGridCoordinates(3);
+        
+        // Boundary areas should have natural spacing, not artificial constraints
+        const actualSpacing = lead3.xOffset - lead0.xOffset - lead0.columnWidth;
+        expect(actualSpacing).toBe(0); // No artificial spacing
+      });
+    });
+
+    describe('Edge cases and robustness', () => {
+      it('should handle very small grid scales gracefully', () => {
+        ecgPlayer.gridScale = 0.5;
+        
+        const result = ecgPlayer.calculateLeadGridCoordinates(0);
+        
+        expect(result.columnWidth).toBeGreaterThan(0);
+        expect(Number.isFinite(result.columnWidth)).toBe(true);
+        
+        // Should use natural column width regardless of scale
+        const expectedColumnWidth = ecgPlayer.chartWidth / 4;
+        expect(result.columnWidth).toBe(expectedColumnWidth);
+      });
+
+      it('should handle large grid scales gracefully', () => {
+        ecgPlayer.gridScale = 2.0;
+        
+        const result = ecgPlayer.calculateLeadGridCoordinates(0);
+        
+        expect(result.columnWidth).toBeGreaterThan(0);
+        expect(Number.isFinite(result.columnWidth)).toBe(true);
+        
+        // Should use natural column width regardless of scale
+        const expectedColumnWidth = ecgPlayer.chartWidth / 4;
+        expect(result.columnWidth).toBe(expectedColumnWidth);
+      });
+
+      it('should handle non-integer column widths correctly', () => {
+        ecgPlayer.chartWidth = 850; // Results in 212.5px column width
+        
+        const result = ecgPlayer.calculateLeadGridCoordinates(0);
+        
+        // Should handle fractional pixels correctly
+        expect(result.columnWidth).toBe(212.5);
+        expect(Number.isFinite(result.columnWidth)).toBe(true);
+      });
     });
   });
 });

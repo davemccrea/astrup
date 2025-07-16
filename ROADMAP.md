@@ -1,30 +1,26 @@
 # HappiHub Roadmap
 
-## ECG Viewer Improvements
+## Next
 
-### Canvas and Drawing
+- [ ] **User Notes for ECGs** - Allow users to add and save notes to ECG recordings
+- [ ] **Playback Control Fix** - Prevent play/pause when no ECG is loaded (add tests)
+- [ ] **Empty State Placeholder** - Show helpful placeholder when no ECGs are saved
+- [ ] **Loading States** - Improved loading indicators throughout the application
+- [ ] **Error Handling Enhancement** - Improve error handling throughout the ECG viewer
+- [ ] **Export Options** - PDF/PNG export of ECG views
+- [ ] **Telemetry Implementation** - Add comprehensive application monitoring and diagnostics
 
-- [x] **Save Button Canvas Fix** - When the save button is pressed the canvas should not be cleared ✅ 2025/07/16
-- [ ] **User Notes for ECGs** - Allow user to add notes to a saved ECG
-- [ ] **Fullscreen Mode** - Implement fullscreen mode for ECG viewer
+## In Progress
 
-### Architecture and Code Quality
+Currently no items in progress.
 
-- [x] **URL Parameter Loading** - ECG Viewer should load ECGs from URL params only ✅ 2025/07/16
-- [ ] **Error Handling Improvement** - Improve error handling in ecg_playback.js
+## Done
 
-### User Experience
+### 2025/07/16
 
-- [x] **Missing ECG Message** - If user visits /ecg/viewer without params or if ECG not found, show message ✅ 2025/07/16
-- [ ] **Empty State Placeholder** - If no ECGs are saved, show placeholder instead of table
-
-### Documentation and Monitoring
-
-- [x] **Project Documentation** - Add CLAUDE.md file with project overview and methodology for writing code (i.e. incremental, test often, commit regularly after green tests, write new tests when new bugs are discovered) ✅ 2025/07/16
-- [ ] **Telemetry Implementation** - Add comprehensive telemetry/diagnostics
-
-## Bug Fixes
-
-### ECG Playback
-
-- [ ] **Playback Control Fix** - Can play/pause even if no ECG is loaded (fix and write test)
+- [x] **Save Button Canvas Fix** - Fixed canvas clearing issue when save button is pressed
+- [x] **Fullscreen Mode** - Implemented fullscreen mode for ECG viewer with Tailwind CSS integration
+- [x] **Multi-Lead Grid Alignment** - Fixed visual discontinuities in multi-lead view using unified continuous grid approach
+- [x] **URL Parameter Loading** - ECG Viewer now loads ECGs from URL params only
+- [x] **Missing ECG Message** - Show appropriate message when ECG not found or no params provided
+- [x] **Project Documentation** - Added CLAUDE.md with project overview and development methodology
