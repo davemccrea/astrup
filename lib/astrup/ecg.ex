@@ -3,6 +3,8 @@ defmodule Astrup.ECG do
   alias Astrup.Accounts.User
   alias Astrup.Accounts.Scope
   alias Astrup.ECG.SavedEcgs
+  alias Astrup.ECG.Collection
+  alias Astrup.ECG.CollectionItem
 
   import Ecto.Query
 
@@ -41,5 +43,66 @@ defmodule Astrup.ECG do
       )
 
     Repo.delete_all(query)
+  end
+
+  # Collection functions
+
+  def list_collections do
+    Repo.all(Collection)
+  end
+
+  def get_collection(id) do
+    Repo.get(Collection, id)
+  end
+
+  def get_collection_by_slug(slug) do
+    Repo.get_by(Collection, slug: slug)
+  end
+
+  def get_collection_with_items(id) do
+    Collection
+    |> Repo.get(id)
+    |> case do
+      nil -> nil
+      collection -> Repo.preload(collection, collection_items: from(ci in CollectionItem, order_by: [asc: coalesce(ci.order, ci.id)]))
+    end
+  end
+
+  def create_collection(attrs) do
+    %Collection{}
+    |> Collection.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def update_collection(%Collection{} = collection, attrs) do
+    collection
+    |> Collection.changeset(attrs)
+    |> Repo.update()
+  end
+
+  def delete_collection(%Collection{} = collection) do
+    Repo.delete(collection)
+  end
+
+  # CollectionItem functions
+
+  def get_collection_item(id) do
+    Repo.get(CollectionItem, id)
+  end
+
+  def add_ecg_to_collection(collection_id, attrs) do
+    %CollectionItem{}
+    |> CollectionItem.changeset(Map.put(attrs, :collection_id, collection_id))
+    |> Repo.insert()
+  end
+
+  def update_collection_item(%CollectionItem{} = collection_item, attrs) do
+    collection_item
+    |> CollectionItem.changeset(attrs)
+    |> Repo.update()
+  end
+
+  def remove_ecg_from_collection(%CollectionItem{} = collection_item) do
+    Repo.delete(collection_item)
   end
 end

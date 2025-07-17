@@ -20,7 +20,7 @@ defmodule AstrupWeb.ECGViewerLive do
     ecg_data = Astrup.Wfdb.read(dataset_name, filename)
     qrs = Astrup.Wfdb.detect_qrs(dataset_name, filename)
     ecg_saved = ECG.is_ecg_saved?(socket.assigns.current_scope, dataset_name, filename)
-    metadata = load_dataset_metadata(dataset_name, filename) |> dbg()
+    metadata = load_dataset_metadata(dataset_name, filename)
 
     {:noreply,
      socket
@@ -57,11 +57,13 @@ defmodule AstrupWeb.ECGViewerLive do
                 class="btn btn-square"
                 id="save-ecg-button"
               >
-                <%= if @ecg_saved do %>
+                <span :if={@ecg_saved}>
                   Unsave <.icon class="h-5 w-5" name="hero-trash" />
-                <% else %>
+                </span>
+
+                <span :if={!@ecg_saved}>
                   Save <.icon class="h-5 w-5" name="hero-document-arrow-down" />
-                <% end %>
+                </span>
               </.button>
             </:actions>
 
@@ -128,16 +130,5 @@ defmodule AstrupWeb.ECGViewerLive do
       _ -> %{}
     end
     |> dbg()
-  end
-
-  defp get_random_record(dataset_name) do
-    with dataset_module when not is_nil(dataset_module) <-
-           DatasetRegistry.get_dataset(dataset_name),
-         record when not is_nil(record) <- dataset_module.get_random_record() do
-      {:ok, record.filename_lr}
-    else
-      nil -> {:error, "Database #{dataset_name} not found"}
-      _ -> {:error, "No records available"}
-    end
   end
 end
