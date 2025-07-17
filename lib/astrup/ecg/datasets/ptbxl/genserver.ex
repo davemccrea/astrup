@@ -16,8 +16,6 @@ defmodule Astrup.ECG.Datasets.Ptbxl.GenServer do
           |> Query.filter_high_quality()
           |> Query.filter_human_validated()
           |> Query.filter_confidence_100()
-          |> Query.filter_second_opinion()
-          |> Query.take_per_scp_code(10)
 
         {:ok, %{records: filtered_records, csv_file: csv_file}}
 

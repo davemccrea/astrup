@@ -43,7 +43,9 @@ defmodule Astrup.ECG.Datasets.Ptbxl.Query do
     |> Enum.filter(fn record ->
       (record.electrodes_problems == "" or record.electrodes_problems == nil) and
         (record.baseline_drift == "" or record.baseline_drift == nil) and
-        (record.pacemaker == "" or record.pacemaker == nil)
+        (record.pacemaker == "" or record.pacemaker == nil) and
+        (record.static_noise == "" or record.static_noise == nil) and
+        (record.burst_noise == "" or record.burst_noise == nil)
     end)
   end
 
