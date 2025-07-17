@@ -73,20 +73,12 @@ defmodule AstrupWeb.Components.EcgPlayer do
                 </.button>
               </div>
 
-              <div class="flex gap-4 fullscreen:bg-base-200 fullscreen:text-base-content fullscreen:p-2.5 fullscreen:rounded-lg">
-                <div id="caliper-measurements" class="hidden text-sm font-mono">
-                  <div class="text-xs text-base-content/70 mb-1">Time Measurement:</div>
-                  <div id="caliper-time-display">--</div>
-                  <div id="caliper-rate-display" class="text-xs text-base-content/70 mt-1">-- BPM</div>
-                </div>
-                
-                <div>
-                  <%= if @instructions != [] do %>
-                    {render_slot(@instructions)}
-                  <% else %>
-                    <AstrupWeb.Components.EcgInstructions.default_instructions />
-                  <% end %>
-                </div>
+              <div class="fullscreen:bg-base-200 fullscreen:text-base-content fullscreen:p-2.5 fullscreen:rounded-lg">
+                <%= if @instructions != [] do %>
+                  {render_slot(@instructions)}
+                <% else %>
+                  <AstrupWeb.Components.EcgInstructions.default_instructions />
+                <% end %>
               </div>
             </div>
           </div>
