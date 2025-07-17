@@ -531,7 +531,10 @@ const ECGPlayer = {
    */
   updateCursorStyle() {
     if (this.backgroundCanvas) {
-      if (this.displayMode === "single") {
+      if (this.calipersMode) {
+        // Caliper mode: show crosshair cursor
+        this.backgroundCanvas.style.cursor = "crosshair";
+      } else if (this.displayMode === "single") {
         // Single lead mode: show zoom-out cursor (click to show all leads)
         this.backgroundCanvas.style.cursor = "zoom-out";
       } else {
@@ -922,7 +925,7 @@ const ECGPlayer = {
    */
   updateCalipersButton() {
     const button = document.getElementById("calipers-button");
-    if (button) {
+    if (button && button.classList) {
       if (this.calipersMode) {
         button.classList.add("btn-active");
         button.title = "Disable Time Calipers (c)";
@@ -1079,12 +1082,17 @@ const ECGPlayer = {
     this.activeCaliper = null;
     this.isDragging = false;
     this.dragStartPoint = null;
+    this.calipersMode = false;
     
     if (this.calipersContext) {
       const devicePixelRatio = window.devicePixelRatio || 1;
       const canvasHeight = this.calipersCanvas.height / devicePixelRatio;
       this.calipersContext.clearRect(0, 0, this.chartWidth, canvasHeight);
     }
+    
+    // Update button state and cursor
+    this.updateCalipersButton();
+    this.updateCursorStyle();
   },
 
   /**
@@ -1164,7 +1172,7 @@ const ECGPlayer = {
   drawProfessionalCaliper(ctx, startX, startY, endX, endY, color) {
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2;
     
     // Main measurement line
     ctx.beginPath();
