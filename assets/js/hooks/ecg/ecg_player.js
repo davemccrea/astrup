@@ -561,7 +561,8 @@ const ECGPlayer = {
       if (this.displayMode === "multi") {
         const clickedLeadIndex = this.getLeadIndexFromClick(x, y);
         if (clickedLeadIndex !== null) {
-          // TODO
+          // Clear calipers when switching to single lead mode
+          this.clearCalipers();
           this.displayMode = "single";
           this.updateDisplayModeSelector("single");
           this.switchLead(clickedLeadIndex);
@@ -571,6 +572,7 @@ const ECGPlayer = {
         }
       } else if (this.displayMode === "single") {
         // In single lead mode, any click on the grid switches to multi-lead mode
+        this.clearCalipers();
         this.displayMode = "multi";
         this.updateDisplayModeSelector("multi");
         this.updateLeadSelectorVisibility("multi");
@@ -631,6 +633,9 @@ const ECGPlayer = {
 
     this.currentLead = leadIndex;
     this.currentLeadData = this.ecgLeadDatasets[leadIndex];
+
+    // Clear any existing caliper measurements when changing leads
+    this.clearCalipers();
 
     // Update the lead selector to match the current lead
     const leadSelector = /** @type {HTMLSelectElement} */ (
@@ -937,8 +942,10 @@ const ECGPlayer = {
       this.calipersCanvas.style.pointerEvents = this.calipersMode ? "auto" : "none";
       
       if (this.calipersMode) {
+        this.calipersCanvas.style.cursor = "crosshair";
         this.setupCalipersEventListeners();
       } else {
+        this.calipersCanvas.style.cursor = "default";
         this.removeCalipersEventListeners();
       }
     }
@@ -1085,10 +1092,7 @@ const ECGPlayer = {
    * @returns {void}
    */
   showCalipersDisplay() {
-    const display = document.getElementById("caliper-measurements");
-    if (display) {
-      display.classList.remove("hidden");
-    }
+    // No UI display box - measurements only shown on canvas
   },
 
   /**
@@ -1096,10 +1100,7 @@ const ECGPlayer = {
    * @returns {void}
    */
   hideCalipersDisplay() {
-    const display = document.getElementById("caliper-measurements");
-    if (display) {
-      display.classList.add("hidden");
-    }
+    // No UI display box - measurements only shown on canvas
   },
 
   /**
@@ -1131,21 +1132,18 @@ const ECGPlayer = {
     const ctx = this.calipersContext;
     const { startX, startY, endX, endY, complete } = caliper;
     
-    // Set line style
-    ctx.strokeStyle = complete ? "#00ff00" : "#ff6600";
-    ctx.lineWidth = 2;
+    // Modern medical equipment colors: blue for active, green for complete
+    const activeColor = "#4A90E2";   // Modern blue
+    const completeColor = "#27AE60"; // Modern green
+    const color = complete ? completeColor : activeColor;
+    
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 3;
     ctx.lineCap = "round";
-    ctx.fillStyle = complete ? "#00ff00" : "#ff6600";
     
-    // Draw the main line
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-    
-    // Draw crosshairs at both ends
-    this.drawCrosshair(ctx, startX, startY, complete);
-    this.drawCrosshair(ctx, endX, endY, complete);
+    // Draw professional caliper arms with perpendicular markers
+    this.drawProfessionalCaliper(ctx, startX, startY, endX, endY, color);
     
     // Draw measurement text if complete
     if (complete) {
@@ -1154,35 +1152,88 @@ const ECGPlayer = {
   },
 
   /**
-   * Draws a crosshair at the specified position.
+   * Draws a professional ECG caliper with perpendicular markers.
+   * @param {CanvasRenderingContext2D} ctx - The canvas context.
+   * @param {number} startX - Starting x coordinate.
+   * @param {number} startY - Starting y coordinate.
+   * @param {number} endX - Ending x coordinate.
+   * @param {number} endY - Ending y coordinate.
+   * @param {string} color - The color to use.
+   * @returns {void}
+   */
+  drawProfessionalCaliper(ctx, startX, startY, endX, endY, color) {
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 3;
+    
+    // Main measurement line
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+    
+    // Draw perpendicular markers at both ends
+    this.drawPerpendicularMarker(ctx, startX, startY, endX, endY, true);  // Start marker
+    this.drawPerpendicularMarker(ctx, endX, endY, startX, startY, false); // End marker
+    
+    // Draw measurement indicators (small triangles)
+    this.drawMeasurementIndicator(ctx, startX, startY, color);
+    this.drawMeasurementIndicator(ctx, endX, endY, color);
+  },
+
+  /**
+   * Draws a perpendicular marker at the specified point.
+   * @param {CanvasRenderingContext2D} ctx - The canvas context.
+   * @param {number} x - The x coordinate of the marker.
+   * @param {number} y - The y coordinate of the marker.
+   * @param {number} refX - Reference x coordinate for perpendicular calculation.
+   * @param {number} refY - Reference y coordinate for perpendicular calculation.
+   * @param {boolean} isStart - Whether this is the start marker.
+   * @returns {void}
+   */
+  drawPerpendicularMarker(ctx, x, y, refX, refY, isStart) {
+    const markerLength = 16;
+    
+    // Calculate perpendicular direction
+    const dx = refX - x;
+    const dy = refY - y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    
+    if (length > 0) {
+      // Normalize and rotate 90 degrees
+      const perpX = -dy / length;
+      const perpY = dx / length;
+      
+      // Draw perpendicular line
+      ctx.beginPath();
+      ctx.moveTo(x + perpX * markerLength/2, y + perpY * markerLength/2);
+      ctx.lineTo(x - perpX * markerLength/2, y - perpY * markerLength/2);
+      ctx.stroke();
+    } else {
+      // Fallback for zero-length line
+      ctx.beginPath();
+      ctx.moveTo(x, y - markerLength/2);
+      ctx.lineTo(x, y + markerLength/2);
+      ctx.stroke();
+    }
+  },
+
+  /**
+   * Draws a small triangular measurement indicator.
    * @param {CanvasRenderingContext2D} ctx - The canvas context.
    * @param {number} x - The x coordinate.
    * @param {number} y - The y coordinate.
-   * @param {boolean} complete - Whether the caliper is complete.
+   * @param {string} color - The color to use.
    * @returns {void}
    */
-  drawCrosshair(ctx, x, y, complete) {
-    const crosshairSize = 8;
-    const color = complete ? "#00ff00" : "#ff6600";
-    
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    
-    // Vertical line
+  drawMeasurementIndicator(ctx, x, y, color) {
+    const size = 4;
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(x, y - crosshairSize);
-    ctx.lineTo(x, y + crosshairSize);
-    ctx.stroke();
-    
-    // Horizontal line
-    ctx.beginPath();
-    ctx.moveTo(x - crosshairSize, y);
-    ctx.lineTo(x + crosshairSize, y);
-    ctx.stroke();
-    
-    // Center dot
-    ctx.beginPath();
-    ctx.arc(x, y, 2, 0, 2 * Math.PI);
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x - size, y + size);
+    ctx.lineTo(x + size, y + size);
+    ctx.closePath();
     ctx.fill();
   },
 
@@ -1195,22 +1246,44 @@ const ECGPlayer = {
   drawMeasurementText(ctx, caliper) {
     const measurement = this.calculateTimeInterval(caliper.startX, caliper.endX);
     const midX = (caliper.startX + caliper.endX) / 2;
-    const midY = (caliper.startY + caliper.endY) / 2 - 20;
+    const midY = (caliper.startY + caliper.endY) / 2;
     
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 12px Arial";
+    // Modern medical monitor style text
+    ctx.font = "bold 11px monospace"; // Monospace font for medical precision
     ctx.textAlign = "center";
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 3;
     
-    const text = `${measurement.milliseconds.toFixed(0)}ms`;
-    ctx.strokeText(text, midX, midY);
-    ctx.fillText(text, midX, midY);
+    // Create measurement box background
+    const timeText = `${measurement.milliseconds.toFixed(0)}ms`;
+    const bpmText = measurement.heartRate > 0 ? `${measurement.heartRate.toFixed(0)} BPM` : "";
     
-    if (measurement.heartRate > 0) {
-      const bpmText = `${measurement.heartRate.toFixed(0)} BPM`;
-      ctx.strokeText(bpmText, midX, midY + 15);
-      ctx.fillText(bpmText, midX, midY + 15);
+    // Calculate text dimensions for background box
+    const textMetrics = ctx.measureText(timeText);
+    const boxWidth = Math.max(textMetrics.width, ctx.measureText(bpmText).width) + 12;
+    const boxHeight = bpmText ? 30 : 18;
+    
+    // Position text above the caliper line
+    const textY = midY - 30;
+    
+    // Draw modern semi-transparent background box
+    ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+    ctx.fillRect(midX - boxWidth/2, textY - 14, boxWidth, boxHeight);
+    
+    // Draw subtle border around text box
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(midX - boxWidth/2, textY - 14, boxWidth, boxHeight);
+    
+    // Draw the measurement text in modern dark color
+    ctx.fillStyle = "#2C3E50"; // Modern dark blue-gray
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.lineWidth = 2;
+    
+    ctx.strokeText(timeText, midX, textY);
+    ctx.fillText(timeText, midX, textY);
+    
+    if (bpmText) {
+      ctx.strokeText(bpmText, midX, textY + 14);
+      ctx.fillText(bpmText, midX, textY + 14);
     }
   },
 
@@ -1235,24 +1308,7 @@ const ECGPlayer = {
    * @returns {void}
    */
   updateCalipersDisplay() {
-    if (!this.activeCaliper) return;
-    
-    const measurement = this.calculateTimeInterval(this.activeCaliper.startX, this.activeCaliper.endX);
-    
-    const timeDisplay = document.getElementById("caliper-time-display");
-    const rateDisplay = document.getElementById("caliper-rate-display");
-    
-    if (timeDisplay) {
-      timeDisplay.textContent = `${measurement.milliseconds.toFixed(0)} ms`;
-    }
-    
-    if (rateDisplay) {
-      if (measurement.heartRate > 0) {
-        rateDisplay.textContent = `${measurement.heartRate.toFixed(0)} BPM`;
-      } else {
-        rateDisplay.textContent = "-- BPM";
-      }
-    }
+    // No UI display box - measurements only shown on canvas
   },
 
   // ===================
@@ -1364,6 +1420,7 @@ const ECGPlayer = {
     this.calipersCanvas.style.display = "block";
     this.calipersCanvas.style.marginTop = `-${canvasHeight}px`; // Overlap the QRS flash canvas
     this.calipersCanvas.style.pointerEvents = this.calipersMode ? "auto" : "none";
+    this.calipersCanvas.style.cursor = this.calipersMode ? "crosshair" : "default";
     container.appendChild(this.calipersCanvas);
 
     this.calipersContext = this.calipersCanvas.getContext("2d");
