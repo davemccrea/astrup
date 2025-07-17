@@ -138,6 +138,10 @@ const ECGPlayer = {
           event.preventDefault();
           this.toggleFullscreen();
           break;
+        case "c":
+          event.preventDefault();
+          this.toggleCalipers();
+          break;
       }
     };
 
@@ -217,6 +221,8 @@ const ECGPlayer = {
     this.allLeadsCursorData = null;
     this.activeCursorData = null;
     this.eventHandlers = null;
+    this.calipers = null;
+    this.activeCaliper = null;
   },
 
   // =================
@@ -255,6 +261,19 @@ const ECGPlayer = {
     this.waveformContext = null;
     this.qrsFlashCanvas = null;
     this.qrsFlashContext = null;
+    this.calipersCanvas = null;
+    this.calipersContext = null;
+
+    // Calipers state
+    this.calipersMode = false;
+    this.calipers = [];
+    this.activeCaliper = null;
+    this.calipersType = 'time';
+    this.isDragging = false;
+    this.dragStartPoint = null;
+    this.calipersClickHandler = null;
+    this.calipersMouseMoveHandler = null;
+    this.calipersMouseUpHandler = null;
 
     // Fullscreen state
     this.isFullscreen = false;
@@ -363,6 +382,9 @@ const ECGPlayer = {
 
       // Setup fullscreen button
       this.setupFullscreenButton();
+      
+      // Setup calipers button
+      this.setupCalipersButton();
 
       console.log("ECG data loaded successfully:", {
         samplingRate: this.samplingRate,
@@ -855,6 +877,385 @@ const ECGPlayer = {
   },
 
   // ===================
+  // CALIPERS FUNCTIONALITY
+  // ===================
+
+  /**
+   * Sets up the calipers button click handler.
+   * @returns {void}
+   */
+  setupCalipersButton() {
+    const button = document.getElementById("calipers-button");
+    if (button && !button.dataset.listenerAdded) {
+      button.addEventListener("click", () => {
+        this.toggleCalipers();
+      });
+      button.dataset.listenerAdded = "true";
+    }
+  },
+
+  /**
+   * Toggles calipers mode on/off.
+   * @returns {void}
+   */
+  toggleCalipers() {
+    this.calipersMode = !this.calipersMode;
+    this.updateCalipersButton();
+    this.updateCalipersInteraction();
+    
+    if (!this.calipersMode) {
+      this.clearCalipers();
+      this.hideCalipersDisplay();
+    } else {
+      this.showCalipersDisplay();
+    }
+  },
+
+  /**
+   * Updates the calipers button visual state.
+   * @returns {void}
+   */
+  updateCalipersButton() {
+    const button = document.getElementById("calipers-button");
+    if (button) {
+      if (this.calipersMode) {
+        button.classList.add("btn-active");
+        button.title = "Disable Time Calipers (c)";
+      } else {
+        button.classList.remove("btn-active");
+        button.title = "Enable Time Calipers (c)";
+      }
+    }
+  },
+
+  /**
+   * Updates the canvas pointer events for calipers interaction.
+   * @returns {void}
+   */
+  updateCalipersInteraction() {
+    if (this.calipersCanvas) {
+      this.calipersCanvas.style.pointerEvents = this.calipersMode ? "auto" : "none";
+      
+      if (this.calipersMode) {
+        this.setupCalipersEventListeners();
+      } else {
+        this.removeCalipersEventListeners();
+      }
+    }
+  },
+
+  /**
+   * Sets up mouse event listeners for caliper interaction.
+   * @returns {void}
+   */
+  setupCalipersEventListeners() {
+    if (!this.calipersCanvas) return;
+    
+    this.calipersClickHandler = (event) => {
+      const rect = this.calipersCanvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      
+      // If no active caliper or previous one is complete, start new caliper
+      if (!this.activeCaliper || this.activeCaliper.complete) {
+        this.startCaliper(x, y);
+      }
+    };
+    
+    this.calipersMouseMoveHandler = (event) => {
+      if (this.isDragging && this.activeCaliper) {
+        const rect = this.calipersCanvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        this.updateCaliper(x, y);
+      }
+    };
+    
+    this.calipersMouseUpHandler = (event) => {
+      if (this.isDragging) {
+        this.finishCaliper();
+      }
+    };
+    
+    this.calipersCanvas.addEventListener("mousedown", this.calipersClickHandler);
+    this.calipersCanvas.addEventListener("mousemove", this.calipersMouseMoveHandler);
+    this.calipersCanvas.addEventListener("mouseup", this.calipersMouseUpHandler);
+    
+    // Also listen for mouse events on document to handle drag outside canvas
+    document.addEventListener("mousemove", this.calipersMouseMoveHandler);
+    document.addEventListener("mouseup", this.calipersMouseUpHandler);
+  },
+
+  /**
+   * Removes mouse event listeners for caliper interaction.
+   * @returns {void}
+   */
+  removeCalipersEventListeners() {
+    if (this.calipersCanvas && this.calipersClickHandler) {
+      this.calipersCanvas.removeEventListener("mousedown", this.calipersClickHandler);
+      this.calipersCanvas.removeEventListener("mousemove", this.calipersMouseMoveHandler);
+      this.calipersCanvas.removeEventListener("mouseup", this.calipersMouseUpHandler);
+      
+      // Remove document listeners too
+      document.removeEventListener("mousemove", this.calipersMouseMoveHandler);
+      document.removeEventListener("mouseup", this.calipersMouseUpHandler);
+    }
+  },
+
+  /**
+   * Starts creating a new caliper.
+   * @param {number} x - The x coordinate of the starting point.
+   * @param {number} y - The y coordinate of the starting point.
+   * @returns {void}
+   */
+  startCaliper(x, y) {
+    // Clear previous caliper only if there's a completed one
+    if (this.activeCaliper && this.activeCaliper.complete) {
+      this.clearCalipers();
+    }
+    
+    // Set dragging state AFTER clearing (since clearCalipers sets isDragging = false)
+    this.isDragging = true;
+    this.dragStartPoint = { x, y };
+    
+    // Create new caliper starting at this position
+    this.activeCaliper = {
+      id: Date.now(),
+      type: 'time',
+      startX: x,
+      startY: y,
+      endX: x,
+      endY: y,
+      complete: false
+    };
+    
+    // Add to calipers array (or replace if clearing)
+    this.calipers = [this.activeCaliper];
+    this.renderCalipers();
+  },
+
+  /**
+   * Updates the active caliper during dragging.
+   * @param {number} x - The x coordinate of the current point.
+   * @param {number} y - The y coordinate of the current point.
+   * @returns {void}
+   */
+  updateCaliper(x, y) {
+    if (this.activeCaliper) {
+      this.activeCaliper.endX = x;
+      this.activeCaliper.endY = y;
+      this.renderCalipers();
+      this.updateCalipersDisplay();
+    }
+  },
+
+  /**
+   * Finishes creating the active caliper.
+   * @returns {void}
+   */
+  finishCaliper() {
+    if (this.activeCaliper) {
+      this.activeCaliper.complete = true;
+      this.isDragging = false;
+      this.dragStartPoint = null;
+      this.updateCalipersDisplay();
+      this.renderCalipers(); // Re-render to show green color
+    }
+  },
+
+  /**
+   * Clears all calipers from the canvas.
+   * @returns {void}
+   */
+  clearCalipers() {
+    this.calipers = [];
+    this.activeCaliper = null;
+    this.isDragging = false;
+    this.dragStartPoint = null;
+    
+    if (this.calipersContext) {
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      const canvasHeight = this.calipersCanvas.height / devicePixelRatio;
+      this.calipersContext.clearRect(0, 0, this.chartWidth, canvasHeight);
+    }
+  },
+
+  /**
+   * Shows the calipers measurement display.
+   * @returns {void}
+   */
+  showCalipersDisplay() {
+    const display = document.getElementById("caliper-measurements");
+    if (display) {
+      display.classList.remove("hidden");
+    }
+  },
+
+  /**
+   * Hides the calipers measurement display.
+   * @returns {void}
+   */
+  hideCalipersDisplay() {
+    const display = document.getElementById("caliper-measurements");
+    if (display) {
+      display.classList.add("hidden");
+    }
+  },
+
+  /**
+   * Renders all calipers on the canvas.
+   * @returns {void}
+   */
+  renderCalipers() {
+    if (!this.calipersContext) return;
+    
+    // Clear the canvas
+    const devicePixelRatio = window.devicePixelRatio || 1;
+    const canvasHeight = this.calipersCanvas.height / devicePixelRatio;
+    this.calipersContext.clearRect(0, 0, this.chartWidth, canvasHeight);
+    
+    // Render each caliper
+    this.calipers.forEach(caliper => {
+      this.renderSingleCaliper(caliper);
+    });
+  },
+
+  /**
+   * Renders a single caliper on the canvas.
+   * @param {object} caliper - The caliper object to render.
+   * @returns {void}
+   */
+  renderSingleCaliper(caliper) {
+    if (!this.calipersContext) return;
+    
+    const ctx = this.calipersContext;
+    const { startX, startY, endX, endY, complete } = caliper;
+    
+    // Set line style
+    ctx.strokeStyle = complete ? "#00ff00" : "#ff6600";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.fillStyle = complete ? "#00ff00" : "#ff6600";
+    
+    // Draw the main line
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+    
+    // Draw crosshairs at both ends
+    this.drawCrosshair(ctx, startX, startY, complete);
+    this.drawCrosshair(ctx, endX, endY, complete);
+    
+    // Draw measurement text if complete
+    if (complete) {
+      this.drawMeasurementText(ctx, caliper);
+    }
+  },
+
+  /**
+   * Draws a crosshair at the specified position.
+   * @param {CanvasRenderingContext2D} ctx - The canvas context.
+   * @param {number} x - The x coordinate.
+   * @param {number} y - The y coordinate.
+   * @param {boolean} complete - Whether the caliper is complete.
+   * @returns {void}
+   */
+  drawCrosshair(ctx, x, y, complete) {
+    const crosshairSize = 8;
+    const color = complete ? "#00ff00" : "#ff6600";
+    
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    
+    // Vertical line
+    ctx.beginPath();
+    ctx.moveTo(x, y - crosshairSize);
+    ctx.lineTo(x, y + crosshairSize);
+    ctx.stroke();
+    
+    // Horizontal line
+    ctx.beginPath();
+    ctx.moveTo(x - crosshairSize, y);
+    ctx.lineTo(x + crosshairSize, y);
+    ctx.stroke();
+    
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, 2 * Math.PI);
+    ctx.fill();
+  },
+
+  /**
+   * Draws measurement text near the caliper.
+   * @param {CanvasRenderingContext2D} ctx - The canvas context.
+   * @param {object} caliper - The caliper object.
+   * @returns {void}
+   */
+  drawMeasurementText(ctx, caliper) {
+    const measurement = this.calculateTimeInterval(caliper.startX, caliper.endX);
+    const midX = (caliper.startX + caliper.endX) / 2;
+    const midY = (caliper.startY + caliper.endY) / 2 - 20;
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 12px Arial";
+    ctx.textAlign = "center";
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 3;
+    
+    const text = `${measurement.milliseconds.toFixed(0)}ms`;
+    ctx.strokeText(text, midX, midY);
+    ctx.fillText(text, midX, midY);
+    
+    if (measurement.heartRate > 0) {
+      const bpmText = `${measurement.heartRate.toFixed(0)} BPM`;
+      ctx.strokeText(bpmText, midX, midY + 15);
+      ctx.fillText(bpmText, midX, midY + 15);
+    }
+  },
+
+  /**
+   * Calculates time interval from pixel coordinates.
+   * @param {number} startX - The start x coordinate.
+   * @param {number} endX - The end x coordinate.
+   * @returns {object} Object containing milliseconds and heart rate.
+   */
+  calculateTimeInterval(startX, endX) {
+    const timePerPixel = this.widthSeconds / this.chartWidth;
+    const interval = Math.abs(endX - startX) * timePerPixel;
+    
+    return {
+      milliseconds: interval * 1000,
+      heartRate: interval > 0 ? 60 / interval : 0
+    };
+  },
+
+  /**
+   * Updates the caliper measurement display.
+   * @returns {void}
+   */
+  updateCalipersDisplay() {
+    if (!this.activeCaliper) return;
+    
+    const measurement = this.calculateTimeInterval(this.activeCaliper.startX, this.activeCaliper.endX);
+    
+    const timeDisplay = document.getElementById("caliper-time-display");
+    const rateDisplay = document.getElementById("caliper-rate-display");
+    
+    if (timeDisplay) {
+      timeDisplay.textContent = `${measurement.milliseconds.toFixed(0)} ms`;
+    }
+    
+    if (rateDisplay) {
+      if (measurement.heartRate > 0) {
+        rateDisplay.textContent = `${measurement.heartRate.toFixed(0)} BPM`;
+      } else {
+        rateDisplay.textContent = "-- BPM";
+      }
+    }
+  },
+
+  // ===================
   // CANVAS & DIMENSIONS
   // ===================
 
@@ -953,6 +1354,20 @@ const ECGPlayer = {
 
     this.qrsFlashContext = this.qrsFlashCanvas.getContext("2d");
     this.qrsFlashContext.scale(devicePixelRatio, devicePixelRatio);
+
+    // Create calipers canvas (top layer for measurements)
+    this.calipersCanvas = document.createElement("canvas");
+    this.calipersCanvas.width = this.chartWidth * devicePixelRatio;
+    this.calipersCanvas.height = canvasHeight * devicePixelRatio;
+    this.calipersCanvas.style.width = this.chartWidth + "px";
+    this.calipersCanvas.style.height = canvasHeight + "px";
+    this.calipersCanvas.style.display = "block";
+    this.calipersCanvas.style.marginTop = `-${canvasHeight}px`; // Overlap the QRS flash canvas
+    this.calipersCanvas.style.pointerEvents = this.calipersMode ? "auto" : "none";
+    container.appendChild(this.calipersCanvas);
+
+    this.calipersContext = this.calipersCanvas.getContext("2d");
+    this.calipersContext.scale(devicePixelRatio, devicePixelRatio);
   },
 
   /**
@@ -980,6 +1395,20 @@ const ECGPlayer = {
       this.qrsFlashCanvas.remove();
       this.qrsFlashCanvas = null;
       this.qrsFlashContext = null;
+    }
+    if (this.calipersCanvas) {
+      if (this.calipersClickHandler) {
+        this.calipersCanvas.removeEventListener("mousedown", this.calipersClickHandler);
+        this.calipersCanvas.removeEventListener("mousemove", this.calipersMouseMoveHandler);
+        this.calipersCanvas.removeEventListener("mouseup", this.calipersMouseUpHandler);
+        
+        // Remove document listeners too
+        document.removeEventListener("mousemove", this.calipersMouseMoveHandler);
+        document.removeEventListener("mouseup", this.calipersMouseUpHandler);
+      }
+      this.calipersCanvas.remove();
+      this.calipersCanvas = null;
+      this.calipersContext = null;
     }
   },
 

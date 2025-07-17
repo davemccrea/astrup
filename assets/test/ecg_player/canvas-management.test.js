@@ -114,12 +114,12 @@ describe('ECGPlayer - Canvas Management', () => {
       ecgPlayer.updateCursorStyle = vi.fn();
     });
 
-    it('should create three canvas layers', () => {
+    it('should create four canvas layers', () => {
       ecgPlayer.recreateCanvas();
       
-      expect(global.document.createElement).toHaveBeenCalledTimes(3);
+      expect(global.document.createElement).toHaveBeenCalledTimes(4);
       expect(global.document.createElement).toHaveBeenCalledWith('canvas');
-      expect(mockContainer.appendChild).toHaveBeenCalledTimes(3);
+      expect(mockContainer.appendChild).toHaveBeenCalledTimes(4);
     });
 
     it('should set up canvas dimensions correctly', () => {

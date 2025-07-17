@@ -1,34 +1,23 @@
-# PTB-XL Dataset Demo
+# PTB-XL Dataset
 
 ## Overview
 
 This Livebook demonstrates the most important functions in the PTB-XL dataset processing code. The PTB-XL dataset is a comprehensive ECG database containing 21,837 clinical 12-lead ECGs from 18,885 patients.
 
-## Key Components
-
-The PTB-XL code consists of three main modules:
-
-1. **`Astrup.EcgDatabases.Ptbxl.Parser`** - Parses CSV data with robust handling of special characters
-2. **`Astrup.EcgDatabases.Ptbxl.Query`** - Selects and filters ECG records based on diagnosis criteria
-
 ## 1. Loading and Parsing Data
 
-First, let's load the PTB-XL database CSV file:
-
 ```elixir
-# Load the PTB-XL database
-{:ok, data} = Astrup.EcgDatabases.Ptbxl.Parser.parse_file("lib/astrup/datasets/ptbxl/ptbxl_database.csv")
+# Load the PTB-XL dataset
+records = Astrup.ECG.Datasets.Ptbxl.get_all_records
 
-IO.puts("Loaded #{length(data.rows)} ECG records")
-IO.puts("Header fields: #{length(data.header)}")
+IO.puts("Loaded #{length(records)} ECG records")
 ```
 
 Let's examine the structure of a single record:
 
 ```elixir
-# Show the first record
-first_record = List.first(data.rows)
-IO.inspect(first_record, limit: :infinity)
+# Shows a random record
+random_record = Enum.random(records)
 ```
 
 ## 2. Understanding Diagnosis Categories
@@ -37,102 +26,14 @@ The PTB-XL dataset uses SCP codes to classify ECG abnormalities. Let's explore t
 
 ```elixir
 # Get available diagnoses from high-quality records
-diagnoses = Astrup.EcgDatabases.Ptbxl.Query.get_available_diagnoses(data.rows)
-
-IO.puts("Available diagnosis categories:")
-Enum.each(diagnoses, fn {diagnosis, count} ->
-  IO.puts("  #{diagnosis}: #{count} records")
-end)
+Astrup.ECG.Datasets.Ptbxl.Query.get_metadata(random_record)
 ```
 
-## 3. Analyzing SCP Codes
-
-SCP codes are the standardized diagnostic codes used in the PTB-XL dataset:
-
-```elixir
-# Get all SCP codes from high-quality records with clean signal
-scp_codes = Astrup.EcgDatabases.Ptbxl.Query.get_all_scp_codes(data.rows, :clean_signal)
-
-IO.puts("Top 10 most frequent SCP codes:")
-scp_codes
-|> Enum.take(10)
-|> Enum.each(fn {code, count} ->
-  IO.puts("  #{code}: #{count} occurrences")
-end)
-```
-
-Get detailed statistics for SCP codes:
-
-```elixir
-# Get detailed SCP code statistics with confidence values
-scp_details = Astrup.EcgDatabases.Ptbxl.Query.get_scp_code_details(data.rows, :clean_signal)
-
-IO.puts("Top 5 SCP codes with confidence statistics:")
-scp_details
-|> Enum.take(5)
-|> Enum.each(fn detail ->
-  IO.puts("  #{detail.code}:")
-  IO.puts("    Count: #{detail.count}")
-  IO.puts("    Avg confidence: #{Float.round(detail.avg_confidence, 2)}")
-  IO.puts("    Min confidence: #{detail.min_confidence}")
-  IO.puts("    Max confidence: #{detail.max_confidence}")
-  IO.puts("")
-end)
-```
-
-## 4. Selecting ECG Records by Diagnosis
+## 3. Selecting ECG Records by Diagnosis
 
 The most powerful feature is selecting specific numbers of ECGs for each diagnosis category:
 
 ```elixir
-# Define how many ECGs we want for each diagnosis
-count = %{
-  "NORM" => 100,    # 100 normal ECGs
-  "MI" => 100,       # 50 myocardial infarction ECGs
-  "STTC" => 100,     # 40 ST-T change ECGs
-  "CD" => 100,       # 30 conduction disturbance ECGs
-  "HYP" => 100       # 20 hypertrophy ECGs
-}
-
-# Select the ECGs
-selected_ecgs = Astrup.EcgDatabases.Ptbxl.Query.get_by_scp_code(data.rows, "NORM", count)
-
-IO.puts("Selected #{length(selected_ecgs)} ECG records")
+# Get 1 record that has a SCP code of "SR"
+scp_codes = Astrup.ECG.Datasets.Ptbxl.Query.get_by_scp_code(records, "SR", 1)
 ```
-
-## 5. Working with Individual Records
-
-Let's examine how to get the primary diagnosis for individual records:
-
-```elixir
-# Take a few selected ECGs and show their primary diagnoses
-selected_ecgs
-|> Enum.take(5)
-|> Enum.each(fn record ->
-  diagnosis = Astrup.EcgDatabases.Ptbxl.Query.get_primary_diagnosis(record)
-  IO.puts("ECG #{record.ecg_id}: #{diagnosis}")
-  IO.puts("  SCP codes: #{inspect(record.scp_codes)}")
-  IO.puts("  Age: #{record.age}, Sex: #{if record.sex == 1, do: "Male", else: "Female"}")
-  IO.puts("")
-end)
-```
-
-## Summary
-
-This Livebook demonstrates the key functions for working with the PTB-XL dataset:
-
-1. **`parse_file/1`** - Load and parse CSV data
-2. **`get_available_diagnoses/1`** - Analyze available diagnosis categories
-3. **`get_all_scp_codes/2`** - Get SCP code frequencies
-4. **`get_scp_code_details/2`** - Get detailed SCP code statistics
-5. **`select_by_diagnosis/2`** - Select specific numbers of ECGs per diagnosis
-6. **`get_primary_diagnosis/1`** - Get the primary diagnosis for a record
-
-The code automatically handles:
-
-- Quality filtering (folds 9-10, human validation, clean signals)
-- Robust CSV parsing with special character handling
-- SCP code mapping to diagnostic categories
-- Balanced dataset creation for machine learning
-
-This makes it easy to create high-quality, balanced datasets for ECG analysis and machine learning applications.
